@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tetris</title>
+    <style>
+      h1 {
+        text-align: center;
+      }
+      body {
+        color: #ffffff;
+        background: #232323;
+        text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #fff,
+          0 0 20px #49ff18, 0 0 30px #49ff18, 0 0 40px #49ff18, 0 0 55px #49ff18,
+          0 0 75px #49ff18;
+      }
+      .block {
+        background-color: black;
+        border: 2px solid white;
+        width: 20px;
+        height: 20px;
+      }
+      #container {
+        display: flex;
+        justify-content: center;
+      }
+      .first {
+        background-color: #232323;
+        border: none;
+      }
+      .button-33 {
+        background-color: #c2fbd7;
+        border-radius: 100px;
+        box-shadow: rgba(44, 187, 99, 0.2) 0 -25px 18px -14px inset,
+          rgba(44, 187, 99, 0.15) 0 1px 2px, rgba(44, 187, 99, 0.15) 0 2px 4px,
+          rgba(44, 187, 99, 0.15) 0 4px 8px, rgba(44, 187, 99, 0.15) 0 8px 16px,
+          rgba(44, 187, 99, 0.15) 0 16px 32px;
+        color: green;
+        cursor: pointer;
+        display: inline-block;
+        font-family: CerebriSans-Regular, -apple-system, system-ui, Roboto,
+          sans-serif;
+        padding: 7px 20px;
+        text-align: center;
+        text-decoration: none;
+        transition: all 250ms;
+        border: 0;
+        font-size: 16px;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+      }
+
+      .button-33:hover {
+        box-shadow: rgba(44, 187, 99, 0.35) 0 -25px 18px -14px inset,
+          rgba(44, 187, 99, 0.25) 0 1px 2px, rgba(44, 187, 99, 0.25) 0 2px 4px,
+          rgba(44, 187, 99, 0.25) 0 4px 8px, rgba(44, 187, 99, 0.25) 0 8px 16px,
+          rgba(44, 187, 99, 0.25) 0 16px 32px;
+        transform: scale(1.05) rotate(-1deg);
+      }
+      #score,
+      #hs {
+        font-size: large;
+      }
+      #miniCont {
+        width: 300px;
+        display: flex;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tetris</h1>
+    <div id="miniCont">
+      <div>
+        <button id="cst" class="button-33" role="button">Customize</button>
+        <br />
+        <br />
+        <button id="inst" class="button-33" role="button">Instructions</button>
+      </div>
+      <div>
+        <p id="score">Score: 0</p>
+        <p id="hs">High Score: 0</p>
+        <p id="err"></p>
+      </div>
+    </div>
+    <div id="container"></div>
+  </body>
+  <script>
+    let score = 0,
+      highScore = +localStorage.getItem("hs") || 0,
+      a,
+      b,
+      c,
+      d,
+      aL,
+      bL,
+      cL,
+      dL,
+      a1,
+      b1,
+      c1,
+      d1,
+      id,
+      color,
+      lastBlocks,
+      firstBlocks,
+      count = 0,
+      cc = 0,
+      fc = 0,
+      fallCount = 0,
+      rL = false,
+      lL = false,
+      disabledFlip = false,
+      alreadyChecked = false,
+      disabled = false,
+      alreadyFallen = false,
+      justSecond = false,
+      canTurn = true,
+      phase = 1,
+      turn = false,
+      isDropped = false,
+      allBlocks = [],
+      shape = "",
+      dropped = [],
+      x,
+      y,
+      occupied = [],
+      freeLine = [],
+      clearingLIne = false,
+      fallen = false,
+      prefColor = "",
+      prefShape = "",
+      width = 10,
+      height = 20,
+      fallSpeed = 1000;
+    document.getElementById("hs").innerHTML = `High Score: ${highScore}`;
+    document.getElementById("inst").addEventListener("click", (ev) => {
+      let instructions =
+        "To start the game press the Space button use the Left and Right arrow buttons to move the block. To make it fall at once press the Down arrow. To flip it press the Up arrow. Note you can't flip the block at the first line.";
+      alert(instructions);
+    });
+    document.getElementById("cst").addEventListener("click", (ev) => {
+      width = +prompt("Enter the board width", 10);
+      width = width > 5 ? width : 10;
+      height = +prompt("Enter the board height", 20);
+      height = height > 5 ? height : 20;
+      prefColor = prompt(
+        "If you want enter the color for all blocks(for skipping just press OK)"
+      );
+      prefShape = prompt(
+        "Just as the color. Enter the shape(S, Z, I, O, T, L, J)"
+      );
+      fallSpeed = prompt("Enter the speed of falling in ms", 1000);
+      createBoard(width, height);
+      start();
+    });
+    function createBoard(width, height) {
+      y = width;
+      x = height;
+      allBlocks = [];
+      for (let i = 97; i < 97 + y; i++) {
+        let letter = String.fromCharCode(i);
+        for (let j = 2; j <= 1 + x; j++) {
+          allBlocks.push(letter + j);
+        }
+      }
+      document.getElementById("container").innerHTML = "";
+      for (let i = 97; i < width + 97; i++) {
+        let column = document.createElement("div");
+        for (let g = 1; g < height + 2; g++) {
+          let block = document.createElement("div");
+          block.classList.add("block");
+          if (g === 1) {
+            block.classList.add("first");
+          } else if (g === height + 1) {
+            block.classList.add("last");
+          }
+          block.id = String.fromCharCode(i) + g;
+          column.append(block);
+        }
+        document.getElementById("container").append(column);
+      }
+      firstBlocks = Array.from(document.getElementsByClassName("first"));
+      lastBlocks = Array.from(document.getElementsByClassName("last"));
+      for (let block of lastBlocks) {
+        freeLine.push(block.id);
+      }
+    }
+    createBoard(width, height);
+    function clear() {
+      if (turn) {
+        [a1, b1, c1, d1] = [a, b, c, d];
+        turn = false;
+      }
+      let aS, bS, cS, dS;
+      if (clearingLIne === false) {
+        aS = a1;
+        bS = b1;
+        cS = c1;
+        dS = d1;
+        allBlocks.splice(allBlocks.indexOf(a1), 1);
+        allBlocks.splice(allBlocks.indexOf(b1), 1);
+        allBlocks.splice(allBlocks.indexOf(c1), 1);
+        allBlocks.splice(allBlocks.indexOf(d1), 1);
+      }
+      let arrS = [];
+      for (let id of occupied) {
+        arrS.push(id);
+        allBlocks.splice(allBlocks.indexOf(id), 1);
+      }
+      for (let id of allBlocks) {
+        document.getElementById(id).style.backgroundColor = "black";
+      }
+      arrS.forEach((id) => allBlocks.push(id));
+      if (clearingLIne === false) {
+        allBlocks.push(aS);
+        allBlocks.push(bS);
+        allBlocks.push(cS);
+        allBlocks.push(dS);
+      }
+      for (let block of firstBlocks) {
+        block.style.backgroundColor = "#232323";
+      }
+    }
+    function reset() {
+      score = 0;
+      highScore = 0;
+      Array.from(document.getElementsByClassName("block")).forEach((el) => {
+        if (
+          occupied.some((id) => {
+            id === el.id;
+          }) === false
+        ) {
+          el.style.backgroundColor = "black";
+        }
+      });
+      a = "";
+      b = "";
+      c = "";
+      d = "";
+      a1 = "";
+      b1 = "";
+      c1 = "";
+      d1 = "";
+    }
+    function getRandomColor() {
+      if (prefColor !== "") {
+        return prefColor;
+      }
+      let x = Math.floor(Math.random() * 7 + 1);
+      switch (x) {
+        case 1:
+          return "lightBlue";
+          break;
+        case 2:
+          return "blue";
+          break;
+        case 3:
+          return "orange";
+          break;
+        case 4:
+          return "yellow";
+          break;
+        case 5:
+          return "green";
+          break;
+        case 6:
+          return "red";
+          break;
+        case 7:
+          return "purple";
+          break;
+      }
+    }
+    function check(a, b, c, d) {
+      if (
+        freeLine.some((el) => {
+          if (el === a || el === b || el === c || el === d) {
+            return true;
+          }
+        })
+      ) {
+        return true;
+      }
+    }
+    function clearFreeLine() {
+      for (let i = 0; i < freeLine.length; i++) {
+        let block = freeLine[i];
+        let l = block.split("").shift();
+        switch (block.length) {
+          case 2:
+            block = +block[1];
+            break;
+          case 3:
+            block = Number(block[1] + block[2]);
+            break;
+        }
+        if (block !== 21 && occupied.includes(l + (block + 1)) === false) {
+          freeLine.splice(i, 1);
+          freeLine.push(l + (block + 1));
+          i--;
+        }
+      }
+    }
+    function end(removal, additional) {
+      removal.forEach((id) => occupied.splice(occupied.indexOf(id), 1));
+      additional.forEach((id) => occupied.push(id));
+      clearingLIne = true;
+      clear();
+      clearFreeLine();
+      return [[], []];
+    }
+    function clearLine() {
+      let aLine = true,
+        bLine = true,
+        cLine = true,
+        dLine = true,
+        count = 4,
+        additional = [],
+        removal = [];
+      [aL, bL, cL, dL] = split();
+      if (a !== 21 && b !== 21 && c !== 21 && d !== 21) {
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+        increase();
+      }
+      [aL, bL, cL, dL] = split();
+      for (let i = "a".charCodeAt(); i < y + 97; i++) {
+        if (occupied.includes(String.fromCharCode(i) + a) === false) {
+          count--;
+          aLine = false;
+          break;
+        }
+      }
+      for (let i = "a".charCodeAt(); i < y + 97; i++) {
+        if (occupied.includes(String.fromCharCode(i) + b) === false) {
+          count--;
+          bLine = false;
+          break;
+        }
+      }
+      for (let i = "a".charCodeAt(); i < y + 97; i++) {
+        if (occupied.includes(String.fromCharCode(i) + c) === false) {
+          count--;
+          cLine = false;
+          break;
+        }
+      }
+      for (let i = "a".charCodeAt(); i < y + 97; i++) {
+        if (occupied.includes(String.fromCharCode(i) + d) === false) {
+          count--;
+          dLine = false;
+          break;
+        }
+      }
+      document.getElementById("score").innerHTML = `Score: ${score}`;
+      if (aLine) {
+        bLine = a === b ? false : bLine;
+        cLine = a === c ? false : cLine;
+        dLine = a === d ? false : dLine;
+        for (let i = "a".charCodeAt(); i < y + 97; i++) {
+          occupied.splice(occupied.indexOf(String.fromCharCode(i) + a), 1);
+        }
+        for (let i = 0; i < occupied.length; i++) {
+          block = occupied[i];
+          let color = document.getElementById(block).style.backgroundColor;
+          let l = block.split("").shift();
+          switch (block.length) {
+            case 2:
+              block = +block[1];
+              break;
+            case 3:
+              block = Number(block[1] + block[2]);
+              break;
+          }
+          if (block > a) {
+            continue;
+          } else {
+            removal.push(l + block);
+            block = l + ++block;
+            document.getElementById(block).style.backgroundColor = color;
+            additional.push(block);
+          }
+        }
+        [removal, additional] = end(removal, additional);
+      }
+      if (bLine) {
+        aLine = b === a ? false : aLine;
+        cLine = b === c ? false : cLine;
+        dLine = b === d ? false : dLine;
+        for (let i = "a".charCodeAt(); i < y + 97; i++) {
+          occupied.splice(occupied.indexOf(String.fromCharCode(i) + b), 1);
+        }
+        for (let i = 0; i < occupied.length; i++) {
+          block = occupied[i];
+          let color = document.getElementById(block).style.backgroundColor;
+          let l = block.split("").shift();
+          switch (block.length) {
+            case 2:
+              block = +block[1];
+              break;
+            case 3:
+              block = Number(block[1] + block[2]);
+              break;
+          }
+          if (block > b) {
+            continue;
+          } else {
+            removal.push(l + block);
+            block = l + ++block;
+            document.getElementById(block).style.backgroundColor = color;
+            additional.push(block);
+          }
+        }
+        [removal, additional] = end(removal, additional);
+      }
+      if (cLine) {
+        bLine = c === b ? false : bLine;
+        aLine = c === a ? false : aLine;
+        dLine = c === d ? false : dLine;
+        for (let i = "a".charCodeAt(); i < y + 97; i++) {
+          occupied.splice(occupied.indexOf(String.fromCharCode(i) + c), 1);
+        }
+        for (let i = 0; i < occupied.length; i++) {
+          block = occupied[i];
+          let color = document.getElementById(block).style.backgroundColor;
+          let l = block.split("").shift();
+          switch (block.length) {
+            case 2:
+              block = +block[1];
+              break;
+            case 3:
+              block = Number(block[1] + block[2]);
+              break;
+          }
+          if (block > c) {
+            continue;
+          } else {
+            removal.push(l + block);
+            block = l + ++block;
+            document.getElementById(block).style.backgroundColor = color;
+            additional.push(block);
+          }
+        }
+        [removal, additional] = end(removal, additional);
+      }
+      if (dLine) {
+        bLine = d === b ? false : bLine;
+        cLine = d === c ? false : cLine;
+        aLine = d === a ? false : aLine;
+        for (let i = "a".charCodeAt(); i < y + 97; i++) {
+          occupied.splice(occupied.indexOf(String.fromCharCode(i) + d), 1);
+        }
+        for (let i = 0; i < occupied.length; i++) {
+          block = occupied[i];
+          let color = document.getElementById(block).style.backgroundColor;
+          let l = block.split("").shift();
+          switch (block.length) {
+            case 2:
+              block = +block[1];
+              break;
+            case 3:
+              block = Number(block[1] + block[2]);
+              break;
+          }
+          if (block > d) {
+            continue;
+          } else {
+            removal.push(l + block);
+            block = l + ++block;
+            document.getElementById(block).style.backgroundColor = color;
+            additional.push(block);
+          }
+        }
+        [removal, additional] = end(removal, additional);
+      }
+      count = 0;
+      // console.log(aLine, bLine, cLine, dLine);
+      count += aLine ? 1 : 0;
+      count += bLine ? 1 : 0;
+      count += cLine ? 1 : 0;
+      count += dLine ? 1 : 0;
+      // console.log(count);
+      switch (count) {
+        case 1:
+          score += 40;
+          break;
+        case 2:
+          score += 100;
+          break;
+        case 3:
+          score += 300;
+          break;
+        case 4:
+          score += 1200;
+      }
+    }
+    function placeBlock(a, b, c, d) {
+      // console.log(a, b, c, d);
+      if (justSecond === false) {
+        [a, b, c, d] = decrease();
+      }
+      freeLine.push(a);
+      freeLine.push(b);
+      freeLine.push(c);
+      freeLine.push(d);
+      clearInterval(id);
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      console.log(a, b, c, d);
+      if (a === 1 || b === 1 || c === 1 || d === 1) {
+        // debugger;
+        clearInterval(id);
+        let hs = highScore > score ? highScore : score;
+        localStorage.setItem("hs", hs);
+        document.getElementById(
+          "err"
+        ).innerHTML = `Game OVER! Well Played. Your score is ${score}`;
+      }
+      if (a !== 21 && b !== 21 && c !== 21 && d !== 21) {
+        a = aL + ++a;
+        b = bL + ++b;
+        c = cL + ++c;
+        d = dL + ++d;
+      } else {
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+      }
+      occupied.push(a);
+      occupied.push(b);
+      occupied.push(c);
+      occupied.push(d);
+      clearLine();
+      a = "";
+      b = "";
+      c = "";
+      d = "";
+      a1 = "";
+      b1 = "";
+      c1 = "";
+      d1 = "";
+      cc++;
+      createBlock(generateRandom());
+      score += 10;
+      document.getElementById("score").innerHTML = `Score: ${score}`;
+      return;
+    }
+    function fall(a, b, c, d, color) {
+      if (alreadyFallen) {
+        alreadyFallen = false;
+        return [a, b, c, d];
+      }
+      count = 0;
+      if (alreadyChecked) {
+        return [a, b, c, d];
+      }
+      if (check(a, b, c, d)) {
+        alreadyChecked = true;
+        clearInterval(id);
+        canTurn = false;
+        justSecond = false;
+        disabled = true;
+        placeBlock(a, b, c, d);
+        return [a, b, c, d];
+      }
+      if (typeof a === "number") {
+        return [a, b, c, d];
+      }
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      if (a === x || b === x || c === x || d === x) {
+        document.getElementById(aL + a).style.backgroundColor = "black";
+        document.getElementById(bL + b).style.backgroundColor = "black";
+        document.getElementById(cL + c).style.backgroundColor = "black";
+        document.getElementById(dL + d).style.backgroundColor = "black";
+        document.getElementById(aL + ++a).style.backgroundColor = color;
+        document.getElementById(bL + ++b).style.backgroundColor = color;
+        document.getElementById(cL + ++c).style.backgroundColor = color;
+        document.getElementById(dL + ++d).style.backgroundColor = color;
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+        disabled = true;
+        return [a, b, c, d];
+      }
+      if (a !== 1 && b !== 1 && c !== 1 && d !== 1) {
+        document.getElementById(aL + a).style.backgroundColor = "black";
+        document.getElementById(bL + b).style.backgroundColor = "black";
+        document.getElementById(cL + c).style.backgroundColor = "black";
+        document.getElementById(dL + d).style.backgroundColor = "black";
+      }
+      document.getElementById(aL + ++a).style.backgroundColor = color;
+      document.getElementById(bL + ++b).style.backgroundColor = color;
+      document.getElementById(cL + ++c).style.backgroundColor = color;
+      document.getElementById(dL + ++d).style.backgroundColor = color;
+      a = aL + a;
+      b = bL + b;
+      c = cL + c;
+      d = dL + d;
+      if (
+        freeLine.some((el) => {
+          if (el === a || el === b || el === c || el === d) {
+            return true;
+          }
+        })
+      ) {
+        disabled = true;
+      }
+      return [a, b, c, d];
+    }
+    function increase() {
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      a = aL + ++a;
+      b = bL + ++b;
+      c = cL + ++c;
+      d = dL + ++d;
+    }
+    function decrease() {
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      a = aL + --a;
+      b = bL + --b;
+      c = cL + --c;
+      d = dL + --d;
+      return [a, b, c, d];
+    }
+    function checkCC(fc) {
+      [aL, bL, cL, dL] = split();
+      let aLower = aL + (a + 1);
+      let aUpper = aL + (a - 1);
+      let bLower = bL + (b + 1);
+      let bUpper = bL + (b - 1);
+      let cLower = cL + (c + 1);
+      let cUpper = cL + (c - 1);
+      let dLower = dL + (d + 1);
+      let dUpper = dL + (d - 1);
+      let aBetween =
+        occupied.includes(aLower) && occupied.includes(aUpper) ? true : false;
+      let bBetween =
+        occupied.includes(bLower) && occupied.includes(bUpper) ? true : false;
+      let cBetween =
+        occupied.includes(cLower) && occupied.includes(cUpper) ? true : false;
+      let dBetween =
+        occupied.includes(dLower) && occupied.includes(dUpper) ? true : false;
+      let between = aBetween || bBetween || cBetween || dBetween ? true : false;
+      a = aL + a;
+      b = bL + b;
+      c = cL + c;
+      d = dL + d;
+      if (between && fc === 1) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+    function createBlock(shape) {
+      disabledFlip = true;
+      fc = 0;
+      setTimeout(() => (disabledFlip = false), 1000);
+      clearingLIne = false;
+      phase = 1;
+      alreadyChecked = false;
+      isDropped = false;
+      canTurn = true;
+      color = getRandomColor();
+      switch (shape) {
+        case "I":
+          a = "d1";
+          b = "e1";
+          c = "f1";
+          d = "g1";
+          break;
+        case "J":
+          a = "c1";
+          b = "d1";
+          c = "e1";
+          d = "e2";
+          break;
+        case "L":
+          a = "d2";
+          b = "e2";
+          c = "f2";
+          d = "f1";
+          break;
+        case "O":
+          a = "e1";
+          b = "f1";
+          c = "e2";
+          d = "f2";
+          break;
+        case "T":
+          a = "c1";
+          b = "d1";
+          c = "e1";
+          d = "d2";
+          break;
+        case "S":
+          a = "d2";
+          b = "e2";
+          c = "e1";
+          d = "f1";
+          break;
+        case "Z":
+          a = "d1";
+          b = "e1";
+          c = "e2";
+          d = "f2";
+          break;
+      }
+      let aS = [a, b, c, d];
+      [a1, b1, c1, d1] = fall(a, b, c, d, color);
+      clear();
+      id = setInterval(() => {
+        fc++;
+        if (checkCC(fc)) {
+          [a, b, c, d] = aS;
+        }
+        if (disabled === true) {
+          justSecond = true;
+          placeBlock(a, b, c, d);
+          return;
+        }
+        [a, b, c, d] = fall(a, b, c, d, color);
+        [a1, b1, c1, d1] = [a, b, c, d];
+        clear();
+        if (fallen) {
+          [a1, b1, c1, d1] = [a, b, c, d];
+          count = 0;
+          fallen = false;
+          decrease();
+        } else {
+          [a1, b1, c1, d1] = fall(a, b, c, d, color);
+          clear();
+        }
+      }, fallSpeed);
+      disabled = false;
+    }
+    function generateRandom() {
+      let x = Math.floor(Math.random() * 7 + 1);
+      switch (x) {
+        case 1:
+          x = "I";
+          break;
+        case 2:
+          x = "J";
+          break;
+        case 3:
+          x = "L";
+          break;
+        case 4:
+          x = "O";
+          break;
+        case 5:
+          x = "T";
+          break;
+        case 6:
+          x = "S";
+          break;
+        case 7:
+          x = "Z";
+          break;
+      }
+      if (prefShape !== "") {
+        x = prefShape;
+      }
+      shape = x;
+      return x;
+    }
+    function start() {
+      if (a !== undefined) {
+        if (score !== 0) {
+          let hs = highScore > score ? highScore : score;
+          localStorage.setItem("hs", hs);
+        }
+        location.reload();
+      } else {
+        disabled = false;
+        reset();
+        c++;
+        createBlock(generateRandom());
+      }
+    }
+    function right(a, b, c, d) {
+      if (disabled) {
+        return [a, b, c, d];
+      }
+      count++;
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      let last = String.fromCharCode(96 + y);
+      if (rL) {
+        rL = false;
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+        return [a, b, c, d];
+      }
+      if (aL === last || bL === last || cL === last || dL === last) {
+        rL = true;
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+        return [a, b, c, d];
+      }
+      let a1 = a;
+      let b1 = b;
+      let c1 = c;
+      let d1 = d;
+      let prev = [aL + a1, bL + b1, cL + c1, dL + d1];
+      a1 = a + 1;
+      b1 = b + 1;
+      c1 = c + 1;
+      d1 = d + 1;
+      fallen = true;
+      document.getElementById(aL + a1).style.backgroundColor = "black";
+      document.getElementById(bL + b1).style.backgroundColor = "black";
+      document.getElementById(cL + c1).style.backgroundColor = "black";
+      document.getElementById(dL + d1).style.backgroundColor = "black";
+      a = aL + a1;
+      b = bL + b1;
+      c = cL + c1;
+      d = dL + d1;
+      aL = a.split("").shift().charCodeAt();
+      aL = String.fromCharCode(++aL);
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      bL = b.split("").shift().charCodeAt();
+      bL = String.fromCharCode(++bL);
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      cL = c.split("").shift().charCodeAt();
+      cL = String.fromCharCode(++cL);
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      dL = d.split("").shift().charCodeAt();
+      dL = String.fromCharCode(++dL);
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      if (
+        occupied.some((el) => {
+          if (
+            el === aL + a ||
+            el === dL + d ||
+            el === bL + b ||
+            el === cL + c
+          ) {
+            return true;
+          }
+        })
+      ) {
+        return prev;
+      }
+      let aN;
+      let bN;
+      let cN;
+      let dN;
+      if (count > 1) {
+        aN = a - 1;
+        bN = b - 1;
+        cN = c - 1;
+        dN = d - 1;
+      } else {
+        aN = a;
+        bN = b;
+        cN = c;
+        dN = d;
+      }
+      a = aL + aN;
+      b = bL + bN;
+      c = cL + cN;
+      d = dL + dN;
+      for (let id of prev) {
+        document.getElementById(id).style.backgroundColor = "black";
+      }
+      document.getElementById(a).style.backgroundColor = color;
+      document.getElementById(b).style.backgroundColor = color;
+      document.getElementById(c).style.backgroundColor = color;
+      document.getElementById(d).style.backgroundColor = color;
+      turn = true;
+      return [a, b, c, d];
+    }
+    function left(a, b, c, d) {
+      if (disabled) {
+        return [a, b, c, d];
+      }
+      count++;
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      if (rL) {
+        rL = false;
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+        return [a, b, c, d];
+      }
+      if (aL === "a" || bL === "a" || cL === "a" || dL === "a") {
+        lL = true;
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+        return [a, b, c, d];
+      }
+      let a1 = a;
+      let b1 = b;
+      let c1 = c;
+      let d1 = d;
+      let prev = [aL + a1, bL + b1, cL + c1, dL + d1];
+      a1 = a + 1;
+      b1 = b + 1;
+      c1 = c + 1;
+      d1 = d + 1;
+      fallen = true;
+      document.getElementById(aL + a1).style.backgroundColor = "black";
+      document.getElementById(bL + b1).style.backgroundColor = "black";
+      document.getElementById(cL + c1).style.backgroundColor = "black";
+      document.getElementById(dL + d1).style.backgroundColor = "black";
+      a = aL + a1;
+      b = bL + b1;
+      c = cL + c1;
+      d = dL + d1;
+      aL = a.split("").shift().charCodeAt();
+      aL = String.fromCharCode(--aL);
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      bL = b.split("").shift().charCodeAt();
+      bL = String.fromCharCode(--bL);
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      cL = c.split("").shift().charCodeAt();
+      cL = String.fromCharCode(--cL);
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      dL = d.split("").shift().charCodeAt();
+      dL = String.fromCharCode(--dL);
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      if (
+        occupied.some((el) => {
+          if (
+            el === aL + a ||
+            el === dL + d ||
+            el === bL + b ||
+            el === cL + c
+          ) {
+            return true;
+          }
+        })
+      ) {
+        return prev;
+      }
+      let aN;
+      let bN;
+      let cN;
+      let dN;
+      if (count > 1) {
+        aN = a - 1;
+        bN = b - 1;
+        cN = c - 1;
+        dN = d - 1;
+      } else {
+        aN = a;
+        bN = b;
+        cN = c;
+        dN = d;
+      }
+      a = aL + aN;
+      b = bL + bN;
+      c = cL + cN;
+      d = dL + dN;
+      for (let id of prev) {
+        document.getElementById(id).style.backgroundColor = "black";
+      }
+      document.getElementById(a).style.backgroundColor = color;
+      document.getElementById(b).style.backgroundColor = color;
+      document.getElementById(c).style.backgroundColor = color;
+      document.getElementById(d).style.backgroundColor = color;
+      turn = true;
+      return [a, b, c, d];
+    }
+    function drop() {
+      isDropped = true;
+      clearInterval(id);
+      id = setInterval(() => {
+        if (disabled === true) {
+          justSecond = false;
+          placeBlock(a, b, c, d);
+          return;
+        }
+        [a, b, c, d] = fall(a, b, c, d, color);
+        [a1, b1, c1, d1] = [a, b, c, d];
+        clear();
+      }, 0);
+    }
+    function split() {
+      let aL = a.split("").shift();
+      switch (a.length) {
+        case 2:
+          a = +a[1];
+          break;
+        case 3:
+          a = Number(a[1] + a[2]);
+          break;
+      }
+      let bL = b.split("").shift();
+      switch (b.length) {
+        case 2:
+          b = +b[1];
+          break;
+        case 3:
+          b = Number(b[1] + b[2]);
+          break;
+      }
+      let cL = c.split("").shift();
+      switch (c.length) {
+        case 2:
+          c = +c[1];
+          break;
+        case 3:
+          c = Number(c[1] + c[2]);
+          break;
+      }
+      let dL = d.split("").shift();
+      switch (d.length) {
+        case 2:
+          d = +d[1];
+          break;
+        case 3:
+          d = Number(d[1] + d[2]);
+          break;
+      }
+      return [aL, bL, cL, dL];
+    }
+    function checkFl() {
+      [aL, bL, cL, dL] = split();
+      a1 = aL + ++a;
+      b1 = bL + ++b;
+      c1 = cL + ++c;
+      d1 = dL + ++d;
+      a = aL + --a;
+      b = bL + --b;
+      c = cL + --c;
+      d = dL + --d;
+      if (
+        freeLine.includes(a1) ||
+        freeLine.includes(b1) ||
+        freeLine.includes(c1) ||
+        freeLine.includes(d1) ||
+        freeLine.includes(a) ||
+        freeLine.includes(b) ||
+        freeLine.includes(c) ||
+        freeLine.includes(d)
+      ) {
+        return true;
+      }
+    }
+    function flip() {
+      if (checkFl() || shape === "O" || disabledFlip) {
+        return;
+      }
+      let save = [a, b, c, d];
+      [aL, bL, cL, dL] = split();
+      phase++;
+      if (phase === 5) {
+        phase = 1;
+      }
+      switch (shape) {
+        case "I":
+          switch (phase) {
+            case 1:
+              aL = aL.charCodeAt();
+              aL = String.fromCharCode(--aL);
+              a = aL + ++a;
+              bL = bL.charCodeAt();
+              bL = String.fromCharCode(bL);
+              b = bL + b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(++cL);
+              c = cL + --c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL + 2);
+              d -= 2;
+              d = dL + d;
+              break;
+            case 2:
+              a = bL + ++b;
+              b = bL + ++b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(--cL);
+              c += 3;
+              c = cL + c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL - 2);
+              d += 4;
+              d = dL + d;
+              break;
+            case 3:
+              aL = aL.charCodeAt();
+              aL = String.fromCharCode(--aL);
+              a = aL + ++a;
+              bL = bL.charCodeAt();
+              bL = String.fromCharCode(bL);
+              b = bL + b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(++cL);
+              c = cL + --c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL + 2);
+              d -= 2;
+              d = dL + d;
+              break;
+            case 4:
+              a = bL + ++b;
+              b = bL + ++b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(--cL);
+              c += 3;
+              c = cL + c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL - 2);
+              d += 4;
+              d = dL + d;
+              break;
+          }
+          break;
+        case "J":
+          switch (phase) {
+            case 1:
+              a = cL + (c + 2);
+              b = dL + (d + 2);
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(cL + 2);
+              c = cL + (c + 2);
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(++dL);
+              d = dL + (d + 3);
+              break;
+            case 2:
+              a = bL + b;
+              b = bL + ++b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(--cL);
+              c = cL + (c + 2);
+              dL = dL.charCodeAt();
+              dL -= 2;
+              dL = String.fromCharCode(dL);
+              d = dL + ++d;
+              break;
+            case 3:
+              aL = bL.charCodeAt();
+              aL = String.fromCharCode(++aL);
+              a = aL + (a + 2);
+              b = bL + ++b;
+              cL = bL.charCodeAt();
+              cL = String.fromCharCode(--cL);
+              c = cL + c;
+              d -= 2;
+              d = dL + ++d;
+              break;
+            case 4:
+              a = cL + (c + 2);
+              b = dL + (d + 2);
+              c = dL + ++d;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(++dL);
+              d = dL + d;
+              break;
+          }
+          break;
+        case "L":
+          switch (phase) {
+            case 1:
+              aL = bL.charCodeAt();
+              aL = String.fromCharCode(--aL);
+              a = aL + ++b;
+              cL = bL.charCodeAt();
+              cL = String.fromCharCode(++cL);
+              c = cL + b;
+              b = bL + b;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL + 2);
+              d = dL + ++d;
+              break;
+            case 2:
+              a = bL + b;
+              c = bL + (b + 2);
+              d = dL + (d + 3);
+              b = bL + ++b;
+              break;
+            case 3:
+              aL = bL.charCodeAt();
+              aL = String.fromCharCode(--aL);
+              a = aL + ++b;
+              cL = bL.charCodeAt();
+              cL = String.fromCharCode(++cL);
+              c = cL + b;
+              b = bL + b;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL - 2);
+              d = dL + ++d;
+              break;
+            case 4:
+              a = bL + (b + 2);
+              c = bL + b;
+              b = bL + ++b;
+              d = dL + --d;
+              break;
+          }
+          break;
+        case "T":
+          switch (phase) {
+            case 1:
+              a = cL + ++c;
+              bL = cL.charCodeAt();
+              bL = String.fromCharCode(++bL);
+              b = bL + b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(cL + 2);
+              c = cL + c;
+              d = dL + ++d;
+              break;
+            case 2:
+              a = cL + ++c;
+              bL = dL.charCodeAt();
+              bL = String.fromCharCode(++bL);
+              b = bL + (b + 2);
+              c = cL + (c + 2);
+              d = dL + ++d;
+              break;
+            case 3:
+              a = cL + (c + 1);
+              bL = cL.charCodeAt();
+              bL = String.fromCharCode(--bL);
+              b = bL + (b + 2);
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(cL - 2);
+              c = cL + ++c;
+              d = dL + ++d;
+              break;
+            case 4:
+              a = cL + ++c;
+              b = cL + --c;
+              c = cL + --c;
+              d = dL + ++d;
+              break;
+          }
+          break;
+        case "S":
+          switch (phase) {
+            case 1:
+              a += 2;
+              a = aL + a;
+              bL = bL.charCodeAt();
+              bL = String.fromCharCode(++bL);
+              b = bL + ++b;
+              c = cL + c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(++dL);
+              d = dL + --d;
+              break;
+            case 2:
+              a = aL + a;
+              bL = bL.charCodeAt();
+              bL = String.fromCharCode(--bL);
+              b = bL + ++b;
+              c = cL + (c + 2);
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(--dL);
+              d += 3;
+              d = dL + d;
+              break;
+            case 3:
+              a += 2;
+              a = aL + a;
+              bL = bL.charCodeAt();
+              bL = String.fromCharCode(++bL);
+              b = bL + ++b;
+              c = cL + c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(++dL);
+              d = dL + --d;
+              break;
+            case 4:
+              a = aL + a;
+              bL = bL.charCodeAt();
+              bL = String.fromCharCode(--bL);
+              b = bL + ++b;
+              c = cL + (c + 2);
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(--dL);
+              d += 3;
+              d = dL + d;
+              break;
+          }
+          break;
+        case "Z":
+          switch (phase) {
+            case 1:
+              a = cL + ++c;
+              b = bL + ++b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(++cL);
+              c = cL + ++c;
+              d += 2;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL + 2);
+              d -= 2;
+              d = dL + ++d;
+              break;
+            case 2:
+              a = bL + ++b;
+              b = cL + ++c;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(--cL);
+              c = cL + c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL - 2);
+              d = dL + (d + 2);
+              break;
+            case 3:
+              a = cL + ++c;
+              b = bL + ++b;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(++cL);
+              c = cL + ++c;
+              d += 2;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL + 2);
+              d -= 2;
+              d = dL + ++d;
+              break;
+            case 4:
+              a = bL + ++b;
+              b = cL + ++c;
+              cL = cL.charCodeAt();
+              cL = String.fromCharCode(--cL);
+              c = cL + c;
+              dL = dL.charCodeAt();
+              dL = String.fromCharCode(dL - 2);
+              d = dL + (d + 2);
+              break;
+          }
+          break;
+      }
+      [aL, bL, cL, dL] = split();
+      if (
+        a === x + 1 ||
+        b === x + 1 ||
+        c === x + 1 ||
+        d === x + 1 ||
+        disabled
+      ) {
+        fallCount = 0;
+        [a, b, c, d] = save;
+        return;
+      } else {
+        a = aL + a;
+        b = bL + b;
+        c = cL + c;
+        d = dL + d;
+      }
+      if (
+        allBlocks.includes(a) &&
+        allBlocks.includes(b) &&
+        allBlocks.includes(c) &&
+        allBlocks.includes(d)
+      ) {
+        if (fallCount) {
+          fallCount = 0;
+          [a, b, c, d] = save;
+          return;
+        }
+        turn = true;
+        clear();
+        alreadyFallen = true;
+        document.getElementById(a).style.backgroundColor = color;
+        document.getElementById(b).style.backgroundColor = color;
+        document.getElementById(c).style.backgroundColor = color;
+        document.getElementById(d).style.backgroundColor = color;
+      } else {
+        fallCount++;
+        phase = phase === 1 ? 4 : --phase;
+        [a, b, c, d] = save;
+      }
+    }
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "Space") {
+          start();
+        }
+      },
+      false
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "ArrowRight" && canTurn && disabled === false) {
+          setTimeout(() => {
+            let prev = [a, b, c, d];
+            [a, b, c, d] = right(a, b, c, d);
+            if (prev !== [a, b, c, d]) {
+              clear();
+            }
+          }, 0);
+        }
+      },
+      false
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "ArrowLeft" && canTurn && disabled === false) {
+          setTimeout(() => {
+            let prev = [a, b, c, d];
+            [a, b, c, d] = left(a, b, c, d);
+            if (prev !== [a, b, c, d]) {
+              clear();
+            }
+          }, 0);
+        }
+      },
+      false
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "ArrowDown") {
+          drop();
+        }
+      },
+      false
+    );
+    document.addEventListener(
+      "keyup",
+      (event) => {
+        if (event.code === "ArrowUp") {
+          setTimeout(flip, 0);
+        }
+      },
+      false
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "KeyA") {
+          debugger;
+        }
+      },
+      false
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "KeyQ") {
+          console.clear();
+        }
+      },
+      false
+    );
+  </script>
+</html>
